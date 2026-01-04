@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>To-Do list</title>
+<style>
+  :root {
+    --bg: #0b0b10;
+    --bg-gradient: #1f1f3a;
+    --card: rgba(255,255,255,.08);
+    --accent: #c4b5fd;
+    --text: #f9fafb; 
+    --progress-bg: rgba(255,255,255,.12);
+    --progress-fill-start: var(--accent);
+    --progress-fill-end: #f472b6;
+  }
+
+  * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, var(--bg-gradient), var(--bg));
+    color: var(--text);
+    display: flex;
+    transition: background 0.4s, color 0.4s;
+  }
+
+  /* AUTH SCREEN */
+  #authOverlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .auth-box { background: var(--card); padding: 40px; border-radius: 24px; text-align: center; backdrop-filter: blur(10px); width: 320px; border: 1px solid rgba(255,255,255,0.1); }
+  .auth-box input { 
+    background: rgba(0,0,0,0.3); border: 1px solid var(--accent); color: var(--text);
+    padding: 12px; border-radius: 12px; text-align: center; font-size: 20px; width: 100%; outline: none; margin-top: 15px;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 72px;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(16px);
+    display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 18px;
+    position: fixed; height: 100vh; left: 0; top: 0; z-index: 10;
+  }
+  .sidebar button {
+    background: none; border: none; color: var(--text); opacity: 0.6;
+    font-size: 22px; cursor: pointer; transition: all 0.25s; border-radius: 12px; padding: 8px 12px;
+  }
+  .sidebar button:hover, .sidebar button.active { opacity: 1; color: var(--accent); background: rgba(255, 255, 255, 0.1); }
+  .lock-btn { margin-top: auto; opacity: 0.4 !important; }
+
+  /* MAIN LAYOUT */
+  .main { flex: 1; margin-left: 72px; display: flex; justify-content: center; align-items: flex-start; padding: 40px 20px; position: relative; min-height: 100vh; }
+  .card { width: 100%; max-width: 500px; background: var(--card); backdrop-filter: blur(18px); border-radius: 22px; padding: 30px; box-shadow: 0 30px 60px rgba(0,0,0,.5); display: none; }
+  .card.active-page { display: block; animation: fade 0.4s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  h1, h2, h4, label { color: var(--text); }
+  .gear { position: absolute; top: 20px; right: 20px; font-size: 24px; cursor: pointer; color: var(--text); opacity: 0.7; z-index: 50; }
+
+  /* UI COMPONENTS */
+  .progress { height: 8px; background: var(--progress-bg); border-radius: 999px; overflow: hidden; margin-bottom: 20px; }
+  .progress span { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, var(--progress-fill-start), var(--progress-fill-end)); transition: width 0.3s; }
+  ul { padding: 0; list-style: none; }
+  li { display: flex; align-items: center; gap: 12px; padding: 14px; background: rgba(255,255,255,.06); border-radius: 16px; margin-bottom: 8px; color: var(--text); }
+  li.done { opacity: 0.4; text-decoration: line-through; }
+  .delete { cursor: pointer; color: var(--text); opacity: 0.5; margin-left: auto; }
+
+  input[type="text"], input[type="password"], textarea { 
+    width: 100%; padding: 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); 
+    background: rgba(0,0,0,0.2); color: var(--text); outline: none; margin-bottom: 10px;
+  }
+  ::placeholder { color: var(--text); opacity: 0.4; }
+
+  /* MODAL */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(5px); }
+  .modal.active { display: flex; }
+  .box { background: #151519; padding: 25px; border-radius: 24px; width: 90%; max-width: 420px; border: 1px solid rgba(255,255,255,0.1); max-height: 85vh; overflow-y: auto; color: var(--text); }
+  .btn-action { background: var(--accent); color: #000; border: none; padding: 12px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 5px; }
+  .color-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+
+  /* PRESETS */
+  .preset-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; margin-top: 8px; cursor: pointer; }
+  .preset-delete { color: #f87171; font-weight: bold; padding: 5px; }
+</style>
+</head>
+<body>
+
+  <div id="authOverlay">
+    <div class="auth-box">
+      <h1>Locked</h1>
+      <input type="password" id="passInput" placeholder="Passcode" autofocus>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <button id="todoBtn" class="active">☑️</button>
+    <button id="journalBtn">✍️</button>
+    <button id="lockBtn" class="lock-btn">🔒</button>
+  </div>
+
+  <div class="main">
+    <div class="gear" id="gearBtn">⚙️</div>
+
+    <div class="card active-page" id="todoPage">
+      <h1>To-do list</h1>
+      <div class="progress"><span id="progressBar"></span></div>
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <input id="taskInput" type="text" placeholder="New task..." style="margin-bottom:0">
+        <button id="addTaskBtn" class="btn-action" style="width: auto; margin-top:0;">＋</button>
+      </div>
+      <ul id="todoList"></ul>
+    </div>
+
+    <div class="card" id="journalPage">
+      <h1>Journal 📔</h1>
+      <textarea id="journalText" placeholder="How was your day?"></textarea>
+      <button id="saveJournalBtn" class="btn-action">Save Entry</button>
+      <div id="savedJournals" style="margin-top:20px;"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="settingsModal">
+    <div class="box">
+      <h2>Settings</h2>
+      
+      <div style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px;">
+        <button id="changePassBtn" class="btn-action" style="background: rgba(255,255,255,0.1); color: var(--text);">Change Passcode</button>
+        <div id="stepVerify" style="display:none; margin-top:10px;">
+          <input type="password" id="oldPassInput" placeholder="Current Passcode">
+          <button id="nextStepBtn" class="btn-action">Verify</button>
+        </div>
+        <div id="stepNew" style="display:none; margin-top:10px;">
+          <input type="password" id="newPassInput" placeholder="New Passcode">
+          <button id="saveNewPassBtn" class="btn-action">Save New</button>
+        </div>
+      </div>
+
+      <div class="color-row"><label>Top Glow</label><input type="color" id="bgGradientColor"></div>
+      <div class="color-row"><label>Background</label><input type="color" id="bgColor"></div>
+      <div class="color-row"><label>Card</label><input type="color" id="cardColor"></div>
+      <div class="color-row"><label>Accent</label><input type="color" id="accentColor"></div>
+      <div class="color-row"><label>Text</label><input type="color" id="textColor"></div>
+
+      <div style="margin-top:20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+        <h4>Presets</h4>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="presetName" placeholder="Name it..." style="margin-bottom:0">
+          <button id="savePresetBtn" class="btn-action" style="width: auto; margin-top:0;">Save</button>
+        </div>
+        <div id="presetList"></div>
+      </div>
+
+      <button id="closeSettingsBtn" class="btn-action" style="background:none; color:var(--text); border:1px solid rgba(255,255,255,0.2); margin-top:20px;">Close</button>
+    </div>
+  </div>
+
+<script>
+  const Storage = {
+    get: (key, def) => JSON.parse(localStorage.getItem(key)) || def,
+    set: (key, val) => localStorage.setItem(key, JSON.stringify(val))
+  };
+
+  /* AUTH */
+  let passCode = Storage.get('hub_passcode', '1234');
+  const authOverlay = document.getElementById('authOverlay');
+  const passInput = document.getElementById('passInput');
+  passInput.addEventListener('input', () => { if (passInput.value === passCode) { authOverlay.style.display = 'none'; passInput.value = ''; } });
+  document.getElementById('lockBtn').onclick = () => { authOverlay.style.display = 'flex'; passInput.focus(); };
+
+  /* CHANGE PASSCODE */
+  const changePassBtn = document.getElementById('changePassBtn');
+  const stepVerify = document.getElementById('stepVerify');
+  const stepNew = document.getElementById('stepNew');
+  changePassBtn.onclick = () => { changePassBtn.style.display = 'none'; stepVerify.style.display = 'block'; };
+  document.getElementById('nextStepBtn').onclick = () => { if (document.getElementById('oldPassInput').value === passCode) { stepVerify.style.display = 'none'; stepNew.style.display = 'block'; } else { alert("Wrong passcode."); } };
+  document.getElementById('saveNewPassBtn').onclick = () => { let newVal = document.getElementById('newPassInput').value; if(newVal){ passCode = newVal; Storage.set('hub_passcode', newVal); alert("Updated!"); stepNew.style.display='none'; changePassBtn.style.display='block'; } };
+
+  /* NAV */
+  const todoBtn = document.getElementById('todoBtn'); const journalBtn = document.getElementById('journalBtn');
+  const todoPage = document.getElementById('todoPage'); const journalPage = document.getElementById('journalPage');
+  function switchTab(t) { [todoPage, journalPage].forEach(p=>p.classList.remove('active-page')); [todoBtn, journalBtn].forEach(b=>b.classList.remove('active')); if(t==='todo'){todoPage.classList.add('active-page'); todoBtn.classList.add('active');} else {journalPage.classList.add('active-page'); journalBtn.classList.add('active');} }
+  todoBtn.onclick = () => switchTab('todo'); journalBtn.onclick = () => switchTab('journal');
+
+  /* THEME & PRESETS */
+  const root = document.documentElement;
+  const colorConfig = [
+    { id: 'bgGradientColor', var: '--bg-gradient', key: 'theme_gradient', def: '#1f1f3a' },
+    { id: 'bgColor', var: '--bg', key: 'theme_bg', def: '#0b0b10' },
+    { id: 'cardColor', var: '--card', key: 'theme_card', def: '#151519' },
+    { id: 'accentColor', var: '--accent', key: 'theme_accent', def: '#c4b5fd' },
+    { id: 'textColor', var: '--text', key: 'theme_text', def: '#f9fafb' }
+  ];
+
+  function applyColors(colors) {
+    colorConfig.forEach(c => {
+      let val = colors[c.var] || c.def;
+      root.style.setProperty(c.var, val);
+      document.getElementById(c.id).value = val;
+      localStorage.setItem(c.key, val);
+    });
+  }
+
+  colorConfig.forEach(c => {
+    let saved = localStorage.getItem(c.key) || c.def;
+    root.style.setProperty(c.var, saved);
+    document.getElementById(c.id).value = saved;
+    document.getElementById(c.id).oninput = (e) => { root.style.setProperty(c.var, e.target.value); localStorage.setItem(c.key, e.target.value); };
+  });
+
+  let presets = Storage.get('theme_presets', []);
+  function renderPresets() {
+    const list = document.getElementById('presetList');
+    list.innerHTML = '';
+    presets.forEach((p, i) => {
+      let div = document.createElement('div'); div.className = 'preset-item';
+      div.innerHTML = `<span>${p.name}</span><span class="preset-delete">×</span>`;
+      div.onclick = () => applyColors(p.colors);
+      div.querySelector('.preset-delete').onclick = (e) => { e.stopPropagation(); presets.splice(i,1); Storage.set('theme_presets', presets); renderPresets(); };
+      list.appendChild(div);
+    });
+  }
+
+  document.getElementById('savePresetBtn').onclick = () => {
+    let name = document.getElementById('presetName').value.trim();
+    if(!name) return;
+    let colors = {}; colorConfig.forEach(c => colors[c.var] = document.getElementById(c.id).value);
+    presets.push({ name, colors }); Storage.set('theme_presets', presets);
+    document.getElementById('presetName').value = ''; renderPresets();
+  };
+
+  /* INIT */
+  document.getElementById('gearBtn').onclick = () => document.getElementById('settingsModal').classList.add('active');
+  document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.remove('active');
+  
+  // Tasks/Journal Logic
+  let tasks = Storage.get('tasks', []);
+  function renderTasks() {
+    const tl = document.getElementById('todoList'); tl.innerHTML = '';
+    tasks.forEach((t, i) => {
+      let li = document.createElement('li'); if(t.done) li.className='done';
+      li.innerHTML = `<input type="checkbox" ${t.done?'checked':''}> <span style="flex:1">${t.text}</span> <span class="delete">×</span>`;
+      li.querySelector('input').onclick = () => { tasks[i].done = !tasks[i].done; Storage.set('tasks', tasks); renderTasks(); };
+      li.querySelector('.delete').onclick = () => { tasks.splice(i,1); Storage.set('tasks', tasks); renderTasks(); };
+      tl.appendChild(li);
+    });
+    let d = tasks.filter(t=>t.done).length; document.getElementById('progressBar').style.width = tasks.length ? (d/tasks.length)*100+'%' : '0%';
+  }
+  document.getElementById('addTaskBtn').onclick = () => { let v = document.getElementById('taskInput').value; if(v){ tasks.push({text:v, done:false}); document.getElementById('taskInput').value=''; Storage.set('tasks', tasks); renderTasks(); } };
+
+  let journals = Storage.get('journals', []);
+  function renderJournals() {
+    const jc = document.getElementById('savedJournals'); jc.innerHTML = '';
+    journals.forEach((j, i) => {
+      let div = document.createElement('div'); div.style.cssText = "background:rgba(255,255,255,0.05); padding:10px; border-radius:12px; margin-bottom:8px; cursor:pointer;";
+      div.innerHTML = `<small style="opacity:0.5">${j.date}</small><p style="margin:5px 0">${j.text.substring(0,40)}...</p>`;
+      div.onclick = () => alert(j.text); jc.prepend(div);
+    });
+  }
+  document.getElementById('saveJournalBtn').onclick = () => { let t = document.getElementById('journalText').value; if(t){ journals.push({text:t, date: new Date().toLocaleDateString()}); Storage.set('journals', journals); document.getElementById('journalText').value=''; renderJournals(); } };
+
+  renderTasks(); renderJournals(); renderPresets();
+</script>
+</body>
+</html>
